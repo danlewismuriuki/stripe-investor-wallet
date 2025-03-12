@@ -1,14 +1,10 @@
-// import { Injectable } from '@nestjs/common';
-
-// @Injectable()
-// export class StripeService {}
-
-
 import { Injectable } from "@nestjs/common";
 import Stripe from "stripe";
-import * as dotenv from "dotenv";
 
-dotenv.config();
+// Load dotenv only in local development
+if (process.env.NODE_ENV !== "production") {
+  require("dotenv").config();
+}
 
 @Injectable()
 export class StripeService {
