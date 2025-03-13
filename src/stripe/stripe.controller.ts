@@ -1,9 +1,3 @@
-// import { Controller } from '@nestjs/common';
-
-// @Controller('stripe')
-// export class StripeController {}
-
-
 import { Controller, Post, Body, Req, Res, Headers } from "@nestjs/common";
 import { StripeService } from "./stripe.service";
 import { Request, Response } from "express";
@@ -12,12 +6,43 @@ import { Request, Response } from "express";
 export class StripeController {
   constructor(private readonly stripeService: StripeService) {}
 
-  @Post("create-payment-intent")
-  async createPaymentIntent(@Body() body) {
-    const { amount, currency } = body;
-    return this.stripeService.createPaymentIntent(amount, currency);
+  /** ✅ Create a Stripe Connected Account for a user */
+  @Post("create-account")
+  async createConnectedAccount(@Body() body) {
+    const { email } = body;
+    return this.stripeService.createConnectedAccount(email);
   }
 
+  /** ✅ Generate an onboarding link */
+  @Post("account-link")
+  async generateAccountLink(@Body() body) {
+    const { accountId } = body;
+    return this.stripeService.generateAccountLink(accountId);
+  }
+
+    /** ✅ Investor Funds Their Wallet */
+    @Post("fund-wallet")
+    async fundInvestorWallet(@Body() body) {
+    const { amount, currency, paymentMethodId } = body;
+    return this.stripeService.fundWallet(amount, currency, paymentMethodId);
+    }
+
+ 
+  /** ✅ Create a payment that transfers funds to a connected account */
+  @Post("create-payment")
+  async createPaymentWithTransfer(@Body() body) {
+    const { amount, currency, connectedAccountId } = body;
+    return this.stripeService.createPaymentWithTransfer(amount, currency, connectedAccountId);
+  }
+
+  /** ✅ Payout funds to a connected account */
+  @Post("payout")
+  async createPayout(@Body() body) {
+    const { amount, currency, connectedAccountId } = body;
+    return this.stripeService.createPayout(amount, currency, connectedAccountId);
+  }
+
+  /** ✅ Webhook for Stripe events */
   @Post("webhook")
   async handleWebhook(
     @Req() req: Request,
@@ -45,3 +70,4 @@ export class StripeController {
     }
   }
 }
+
