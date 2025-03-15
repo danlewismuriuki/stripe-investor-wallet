@@ -20,14 +20,13 @@ export class StripeController {
     return this.stripeService.generateAccountLink(accountId);
   }
 
-    /** ✅ Investor Funds Their Wallet */
-    @Post("fund-wallet")
-    async fundInvestorWallet(@Body() body) {
+  /** ✅ Investor Funds Their Wallet */
+  @Post("fund-wallet")
+  async fundInvestorWallet(@Body() body) {
     const { amount, currency, paymentMethodId } = body;
     return this.stripeService.fundWallet(amount, currency, paymentMethodId);
-    }
+  }
 
- 
   /** ✅ Create a payment that transfers funds to a connected account */
   @Post("create-payment")
   async createPaymentWithTransfer(@Body() body) {
@@ -42,7 +41,45 @@ export class StripeController {
     return this.stripeService.createPayout(amount, currency, connectedAccountId);
   }
 
-  /** ✅ Webhook for Stripe events */
+  // /** ✅ Webhook for Stripe events */
+  // @Post("webhook")
+  // async handleWebhook(
+  //   @Req() req: Request,
+  //   @Res() res: Response,
+  //   @Headers("stripe-signature") sig: string
+  // ) {
+  //   const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
+  //   try {
+  //     // Log the request headers and raw body for debugging
+  //     console.log('Request headers:', req.headers);
+  //     console.log('Raw body:', req.rawBody);
+
+  //     // Ensure req.rawBody is defined
+  //     if (!req.rawBody) {
+  //       throw new Error('No raw body provided');
+  //     }
+
+  //     // Use req.rawBody instead of req.body
+  //     const event = this.stripeService.constructWebhookEvent(req.rawBody, sig, endpointSecret);
+
+  //     switch (event.type) {
+  //       case "payment_intent.succeeded":
+  //         console.log("✅ Payment successful! Update investor's balance.");
+  //         break;
+
+  //       case "balance.available":
+  //         console.log("💰 Funds available for transactions.");
+  //         break;
+  //     }
+
+  //     res.json({ received: true });
+  //   } catch (error) {
+  //     console.error("Webhook error:", error.message);
+  //     res.status(400).send(`Webhook Error: ${error.message}`);
+  //   }
+  // }
+
   @Post("webhook")
   async handleWebhook(
     @Req() req: Request,
@@ -50,8 +87,18 @@ export class StripeController {
     @Headers("stripe-signature") sig: string
   ) {
     const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET!;
+
     try {
-      const event = this.stripeService.constructWebhookEvent(req.body, sig, endpointSecret);
+      // Log the request headers and raw body for debugging
+      console.log('Request headers:', req.headers);
+      console.log('Raw body:', req.rawBody);
+
+      // Ensure req.rawBody is defined
+      if (!req.rawBody) {
+        throw new Error('No raw body provided');
+      }
+
+      const event = this.stripeService.constructWebhookEvent(req.rawBody, sig, endpointSecret);
 
       switch (event.type) {
         case "payment_intent.succeeded":
@@ -69,5 +116,5 @@ export class StripeController {
       res.status(400).send(`Webhook Error: ${error.message}`);
     }
   }
-}
 
+}
