@@ -116,5 +116,4 @@ export class StripeController {
       res.status(400).send(`Webhook Error: ${error.message}`);
     }
   }
-
 }
