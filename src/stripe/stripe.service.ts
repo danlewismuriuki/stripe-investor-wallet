@@ -96,8 +96,12 @@ export class StripeService {
     }
   }
 
-  /** ✅ Webhook event handling */
-  constructWebhookEvent(payload: Buffer, sig: string | string[], endpointSecret: string) {
-    return this.stripe.webhooks.constructEvent(payload, sig, endpointSecret);
+  // /** ✅ Webhook event handling */
+  // constructWebhookEvent(payload: Buffer, sig: string | string[], endpointSecret: string) {
+  //   return this.stripe.webhooks.constructEvent(payload, sig, endpointSecret);
+  // }
+
+  constructWebhookEvent(rawBody: Buffer, signature: string, secret: string) {
+    return this.stripe.webhooks.constructEvent(rawBody, signature, secret);
   }
 }
