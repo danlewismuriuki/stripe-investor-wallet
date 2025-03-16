@@ -33,21 +33,38 @@ export class StripeService {
     }
   }
 
-  /** ✅ Generate an onboarding link for the user */
-  async generateAccountLink(accountId: string) {
-    try {
-      const accountLink = await this.stripe.accountLinks.create({
-        account: accountId,
-        refresh_url: "https://yourplatform.com/reauth",
-        return_url: "https://yourplatform.com/dashboard",
-        type: "account_onboarding",
-      });
+  // /** ✅ Generate an onboarding link for the user */
+  // async generateAccountLink(accountId: string) {
+  //   try {
+  //     const accountLink = await this.stripe.accountLinks.create({
+  //       account: accountId,
+  //       refresh_url: "https://yourplatform.com/reauth",
+  //       return_url: "https://yourplatform.com/dashboard",
+  //       type: "account_onboarding",
+  //     });
 
-      return { url: accountLink.url };
-    } catch (error) {
-      throw new Error(`Failed to create account link: ${error.message}`);
-    }
+  //     return { url: accountLink.url };
+  //   } catch (error) {
+  //     throw new Error(`Failed to create account link: ${error.message}`);
+  //   }
+  // }
+
+  /** ✅ Generate an onboarding link for the user */
+async generateAccountLink(accountId: string) {
+  try {
+    const accountLink = await this.stripe.accountLinks.create({
+      account: accountId,
+      refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
+      return_url: "https://stripe-investor-frontend.vercel.app/dashboard",
+      type: "account_onboarding",
+    });
+
+    return { url: accountLink.url };
+  } catch (error) {
+    throw new Error(`Failed to create account link: ${error.message}`);
   }
+}
+
 
   /** ✅ Investors deposit funds into their Stripe balance */
   async fundWallet(amount: number, currency: string, paymentMethodId: string) {
@@ -72,7 +89,7 @@ export class StripeService {
         amount,
         currency,
         destination: connectedAccountId, // Borrower’s Stripe account
-        source_type: "card",
+        // source_type: "card",
       });
 
       return { transferId: transfer.id };
