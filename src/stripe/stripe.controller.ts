@@ -31,12 +31,11 @@ export class StripeController {
     }
   }
 
-  /** ✅ Investor Funds Their Wallet */
   @Post("fund-wallet")
-  async fundInvestorWallet(@Body() body) {
-    const { amount, currency, paymentMethodId } = body;
-    return this.stripeService.fundWallet(amount, currency, paymentMethodId);
-  }
+async fundInvestorWallet(@Body() body) {
+  const { amount, currency, customerId } = body;
+  return this.stripeService.fundWallet(amount, currency, customerId);
+}
 
   /** ✅ Create a payment that transfers funds to a connected account */
   @Post("create-payment")
