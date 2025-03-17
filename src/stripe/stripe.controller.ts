@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Req, Res, Headers, HttpException, HttpStatus } from "@nestjs/common";
+import { Controller, Get, Post, Param, Body, Req, Res, Headers, HttpException, HttpStatus } from "@nestjs/common";
 import { StripeService } from "./stripe.service";
 import { Request, Response } from "express";
 
@@ -18,6 +18,17 @@ export class StripeController {
   async generateAccountLink(@Body() body) {
     const { accountId } = body;
     return this.stripeService.generateAccountLink(accountId);
+  }
+
+  @Get('saved-payment-methods/:customerId')
+  async getSavedPaymentMethods(@Param('customerId') customerId: string) {
+    try {
+      // Call the service method to get saved payment methods
+      const paymentMethods = await this.stripeService.getSavedPaymentMethods(customerId);
+      return paymentMethods;  // Return the saved payment methods to the client
+    } catch (error) {
+      return { error: error.message };  // Handle errors and send them back to the client
+    }
   }
 
   /** ✅ Investor Funds Their Wallet */

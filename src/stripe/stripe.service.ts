@@ -50,6 +50,19 @@ async generateAccountLink(accountId: string) {
   }
 }
 
+async getSavedPaymentMethods(customerId: string) {
+  try {
+    const paymentMethods = await this.stripe.paymentMethods.list({
+      customer: customerId,
+      type: 'card', // Fetch only card payment methods
+    });
+
+    return paymentMethods.data; // Returns an array of saved payment methods
+  } catch (error) {
+    throw new Error(`Failed to retrieve payment methods: ${error.message}`);
+  }
+}
+
 
   /** ✅ Investors deposit funds into their Stripe balance */
   async fundWallet(amount: number, currency: string, paymentMethodId: string) {
