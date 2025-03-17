@@ -52,7 +52,10 @@ async function bootstrap() {
 
    // Enable CORS
    app.enableCors({
-    origin: 'http://localhost:5173',
+    origin: [
+      'http://localhost:5173',
+      'https://stripe-investor-frontend-git-main-rustys-projects-10a06046.vercel.app'  // Allow deployed frontend
+    ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
     allowedHeaders: 'Content-Type, Authorization',
     credentials: true,
