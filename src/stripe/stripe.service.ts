@@ -33,21 +33,6 @@ export class StripeService {
     }
   }
 
-  // /** ✅ Generate an onboarding link for the user */
-  // async generateAccountLink(accountId: string) {
-  //   try {
-  //     const accountLink = await this.stripe.accountLinks.create({
-  //       account: accountId,
-  //       refresh_url: "https://yourplatform.com/reauth",
-  //       return_url: "https://yourplatform.com/dashboard",
-  //       type: "account_onboarding",
-  //     });
-
-  //     return { url: accountLink.url };
-  //   } catch (error) {
-  //     throw new Error(`Failed to create account link: ${error.message}`);
-  //   }
-  // }
 
   /** ✅ Generate an onboarding link for the user */
 async generateAccountLink(accountId: string) {
@@ -55,7 +40,7 @@ async generateAccountLink(accountId: string) {
     const accountLink = await this.stripe.accountLinks.create({
       account: accountId,
       refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
-      return_url: "https://stripe-investor-frontend.vercel.app/dashboard",
+      return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
       type: "account_onboarding",
     });
 
