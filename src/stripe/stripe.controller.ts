@@ -13,6 +13,16 @@ export class StripeController {
     return this.stripeService.createConnectedAccount(email);
   }
 
+  @Get("connected-payment-methods/:connectedAccountId")
+  async getConnectedPaymentMethods(@Param("connectedAccountId") connectedAccountId: string) {
+    try {
+      const paymentMethods = await this.stripeService.getConnectedAccountPaymentMethods(connectedAccountId);
+      return { paymentMethods };
+    } catch (error) {
+      return { error: error.message };
+    }
+  }
+
   /** ✅ Generate an onboarding link */
   @Post("account-link")
   async generateAccountLink(@Body() body) {
@@ -27,7 +37,7 @@ export class StripeController {
       const paymentMethods = await this.stripeService.getSavedPaymentMethods(customerId);
       return paymentMethods;  // Return the saved payment methods to the client
     } catch (error) {
-      return { error: error.message };  // Handle errors and send them back to the client
+      return { error: error.message };
     }
   }
 
