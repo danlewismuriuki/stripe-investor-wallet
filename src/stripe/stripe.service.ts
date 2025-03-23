@@ -33,93 +33,109 @@ export class StripeService {
     }
   }
 
-
   /** ✅ Generate an onboarding link for the user */
-async generateAccountLink(accountId: string) {
-  try {
-    const accountLink = await this.stripe.accountLinks.create({
-      account: accountId,
-      refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
-      return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
-      type: "account_onboarding",
-    });
+  async generateAccountLink(accountId: string) {
+    try {
+      const accountLink = await this.stripe.accountLinks.create({
+        account: accountId,
+        refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
+        return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
+        type: "account_onboarding",
+      });
 
-    return { url: accountLink.url };
-  } catch (error) {
-    throw new Error(`Failed to create account link: ${error.message}`);
+      return { url: accountLink.url };
+    } catch (error) {
+      throw new Error(`Failed to create account link: ${error.message}`);
+    }
   }
-}
 
-async getSavedPaymentMethods(customerId: string) {
-  try {
-    const paymentMethods = await this.stripe.paymentMethods.list({
-      customer: customerId,
-      type: 'card', // Fetch only card payment methods
-    });
+  /** ✅ Retrieve saved payment methods for a customer */
+  async getSavedPaymentMethods(customerId: string) {
+    try {
+      const paymentMethods = await this.stripe.paymentMethods.list({
+        customer: customerId,
+        type: "card", // Fetch only card payment methods
+      });
 
-    return paymentMethods.data; // Returns an array of saved payment methods
-  } catch (error) {
-    throw new Error(`Failed to retrieve payment methods: ${error.message}`);
+      return paymentMethods.data; // Returns an array of saved payment methods
+    } catch (error) {
+      throw new Error(`Failed to retrieve payment methods: ${error.message}`);
+    }
   }
-}
 
-  // async fundWallet(amount: number, currency: string, customerId: string) {
-  //   try {
-  //     // Fetch saved payment methods for the customer
-  //     const paymentMethods = await this.stripe.paymentMethods.list({
-  //       customer: customerId,
-  //       type: 'card', // Fetch only card payment methods
-  //     });
+  async getConnectedAccountPaymentMethods(connectedAccountId: string) {
+    try {
+      const paymentMethods = await this.stripe.paymentMethods.list(
+        { type: "card" },
+        { stripeAccount: connectedAccountId }
+      );
   
-  //     console.log('Payment Methods:', paymentMethods.data); // Log the payment methods
-  
-  //     if (paymentMethods.data.length === 0) {
-  //       throw new Error('No payment methods found for this customer.');
-  //     }
-  
-  //     const paymentMethodId = paymentMethods.data[0].id;
-  
-  //     // Create a PaymentIntent using the valid payment method
-  //     const paymentIntent = await this.stripe.paymentIntents.create({
-  //       amount,
-  //       currency,
-  //       payment_method: paymentMethodId,
-  //       customer: customerId, // Associate the PaymentIntent with the customer
-  //       confirm: true, // Auto-confirm the payment
-  //       off_session: true, // Allow payments without user interaction
-  //     });
-  
-  //     return { clientSecret: paymentIntent.client_secret };
-  //   } catch (error) {
-  //     console.error('Stripe API Error:', error);
-  //     throw new Error(`Failed to fund wallet: ${error.message}`);
-  //   }
-  // }
+      return paymentMethods.data;
+    } catch (error) {
+      throw new Error(`Failed to retrieve payment methods: ${error.message}`);
+    }
+  }
 
+  /** ✅ Attach a payment method to the platform's customer */
+  async attachPaymentMethodToCustomer(customerId: string, paymentMethodId: string) {
+    try {
+      // Attach the payment method to the platform's customer
+      await this.stripe.paymentMethods.attach(paymentMethodId, {
+        customer: customerId,
+      });
 
+      // Set the payment method as the default for the customer
+      await this.stripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+
+      return { success: true };
+    } catch (error) {
+      throw new Error(`Failed to attach payment method: ${error.message}`);
+    }
+  }
+
+  /** ✅ Complete onboarding by attaching the payment method to the platform's customer */
+  async completeOnboarding(customerId: string, connectedAccountId: string) {
+    try {
+      // Step 1: Retrieve payment methods from the connected account
+      const paymentMethods = await this.getConnectedAccountPaymentMethods(connectedAccountId);
+
+      if (paymentMethods.length === 0) {
+        throw new Error("No payment methods found in the connected account.");
+      }
+
+      // Step 2: Attach the payment method to the platform's customer
+      const paymentMethodId = paymentMethods[0].id;
+      await this.attachPaymentMethodToCustomer(customerId, paymentMethodId);
+
+      return { success: true };
+    } catch (error) {
+      throw new Error(`Failed to complete onboarding: ${error.message}`);
+    }
+  }
+
+  /** ✅ Fund the wallet using a saved payment method */
   async fundWallet(amount: number, currency: string, customerId: string) {
     try {
       console.log(`Fetching payment methods for customer: ${customerId}`);
-  
+
       // Fetch saved payment methods for the customer
-      const paymentMethods = await this.stripe.paymentMethods.list({
-        customer: customerId,
-        type: 'card',
-      });
-  
-      console.log('Payment Methods:', paymentMethods.data); // Log to debug
-  
-      if (paymentMethods.data.length === 0) {
-        throw new Error('No payment methods found. Please add a card.');
+      const paymentMethods = await this.getSavedPaymentMethods(customerId);
+
+      console.log("Payment Methods:", paymentMethods); // Log to debug
+
+      if (paymentMethods.length === 0) {
+        throw new Error("No payment methods found. Please add a card.");
       }
-  
-      const paymentMethodId = paymentMethods.data[0].id;
-  
+
+      const paymentMethodId = paymentMethods[0].id;
+
       // Ensure payment method is set as default
       await this.stripe.customers.update(customerId, {
         invoice_settings: { default_payment_method: paymentMethodId },
       });
-  
+
       // Create PaymentIntent
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount,
@@ -129,14 +145,13 @@ async getSavedPaymentMethods(customerId: string) {
         confirm: true,
         off_session: true,
       });
-  
+
       return { clientSecret: paymentIntent.client_secret };
     } catch (error) {
-      console.error('Stripe API Error:', error);
+      console.error("Stripe API Error:", error);
       throw new Error(`Failed to fund wallet: ${error.message}`);
     }
   }
-  
 
   /** ✅ Transfer funds from investor balance to borrower's account */
   async createPaymentWithTransfer(amount: number, currency: string, connectedAccountId: string) {
@@ -145,7 +160,6 @@ async getSavedPaymentMethods(customerId: string) {
         amount,
         currency,
         destination: connectedAccountId, // Borrower’s Stripe account
-        // source_type: "card",
       });
 
       return { transferId: transfer.id };
@@ -169,11 +183,7 @@ async getSavedPaymentMethods(customerId: string) {
     }
   }
 
-  // /** ✅ Webhook event handling */
-  // constructWebhookEvent(payload: Buffer, sig: string | string[], endpointSecret: string) {
-  //   return this.stripe.webhooks.constructEvent(payload, sig, endpointSecret);
-  // }
-
+  /** ✅ Webhook event handling */
   constructWebhookEvent(rawBody: Buffer, signature: string, secret: string) {
     return this.stripe.webhooks.constructEvent(rawBody, signature, secret);
   }
