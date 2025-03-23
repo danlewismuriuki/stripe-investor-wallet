@@ -63,26 +63,6 @@ async getSavedPaymentMethods(customerId: string) {
   }
 }
 
-
-  // /** ✅ Investors deposit funds into their Stripe balance */
-  // async fundWallet(amount: number, currency: string, paymentMethodId: string) {
-  //   try {
-  //     const paymentIntent = await this.stripe.paymentIntents.create({
-  //       amount,
-  //       currency,
-  //       payment_method: paymentMethodId,
-  //       confirm: true, // Auto-confirm the payment
-  //     });
-
-  //     return { clientSecret: paymentIntent.client_secret };
-  //   } catch (error) {
-  //     throw new Error(`Failed to fund wallet: ${error.message}`);
-  //   }
-  // }
-
-
-
-
   // async fundWallet(amount: number, currency: string, customerId: string) {
   //   try {
   //     // Fetch saved payment methods for the customer
@@ -91,11 +71,12 @@ async getSavedPaymentMethods(customerId: string) {
   //       type: 'card', // Fetch only card payment methods
   //     });
   
+  //     console.log('Payment Methods:', paymentMethods.data); // Log the payment methods
+  
   //     if (paymentMethods.data.length === 0) {
   //       throw new Error('No payment methods found for this customer.');
   //     }
   
-  //     // Use the first payment method (or let the user choose one)
   //     const paymentMethodId = paymentMethods.data[0].id;
   
   //     // Create a PaymentIntent using the valid payment method
@@ -110,6 +91,7 @@ async getSavedPaymentMethods(customerId: string) {
   
   //     return { clientSecret: paymentIntent.client_secret };
   //   } catch (error) {
+  //     console.error('Stripe API Error:', error);
   //     throw new Error(`Failed to fund wallet: ${error.message}`);
   //   }
   // }
@@ -117,28 +99,35 @@ async getSavedPaymentMethods(customerId: string) {
 
   async fundWallet(amount: number, currency: string, customerId: string) {
     try {
+      console.log(`Fetching payment methods for customer: ${customerId}`);
+  
       // Fetch saved payment methods for the customer
       const paymentMethods = await this.stripe.paymentMethods.list({
         customer: customerId,
-        type: 'card', // Fetch only card payment methods
+        type: 'card',
       });
   
-      console.log('Payment Methods:', paymentMethods.data); // Log the payment methods
+      console.log('Payment Methods:', paymentMethods.data); // Log to debug
   
       if (paymentMethods.data.length === 0) {
-        throw new Error('No payment methods found for this customer.');
+        throw new Error('No payment methods found. Please add a card.');
       }
   
       const paymentMethodId = paymentMethods.data[0].id;
   
-      // Create a PaymentIntent using the valid payment method
+      // Ensure payment method is set as default
+      await this.stripe.customers.update(customerId, {
+        invoice_settings: { default_payment_method: paymentMethodId },
+      });
+  
+      // Create PaymentIntent
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount,
         currency,
         payment_method: paymentMethodId,
         customer: customerId,
-        confirm: true, // Auto-confirm the payment
-        off_session: true, // Allow payments without user interaction
+        confirm: true,
+        off_session: true,
       });
   
       return { clientSecret: paymentIntent.client_secret };
@@ -147,6 +136,7 @@ async getSavedPaymentMethods(customerId: string) {
       throw new Error(`Failed to fund wallet: ${error.message}`);
     }
   }
+  
 
   /** ✅ Transfer funds from investor balance to borrower's account */
   async createPaymentWithTransfer(amount: number, currency: string, connectedAccountId: string) {
