@@ -31,11 +31,18 @@ export class StripeController {
   }
 
   /** ✅ Generate an onboarding link */
+  // @Post("account-link")
+  // async generateAccountLink(@Body() body) {
+  //   const { accountId } = body;
+  //   return this.stripeService.generateAccountLink(accountId);
+  // }
+
   @Post("account-link")
-  async generateAccountLink(@Body() body) {
-    const { accountId } = body;
-    return this.stripeService.generateAccountLink(accountId);
-  }
+async generateAccountLink(@Body() body) {
+  const { accountId } = body;
+  const { url } = await this.stripeService.generateAccountLink(accountId);
+  return { url };
+}
 
     /** ✅ Fetch saved payment methods */
   @Get("saved-payment-methods/:accountId")
