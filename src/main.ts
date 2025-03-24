@@ -99,8 +99,18 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // ✅ Ensure CORS headers are set properly
+  // app.enableCors({
+  //   origin: '*',
+  //   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+  //   allowedHeaders: ['Content-Type', 'Authorization'],
+  //   credentials: true,
+  // });
+
   app.enableCors({
-    origin: '*',
+    origin: [
+      'http://localhost:5173',  // Local development
+      'https://stripe-investor-frontend-git-main-rustys-projects-10a06046.vercel.app',  // Deployed frontend
+    ],
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,

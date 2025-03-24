@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { User } from "./src/user.entity";
+import { UserRepository } from "./src/stripe/user.repository"; 
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -8,7 +9,7 @@ export const AppDataSource = new DataSource({
   ssl: { rejectUnauthorized: false },
   synchronize: true,
   logging: true,
-  entities: [User],
+  entities: [User, UserRepository],
 });
 
 AppDataSource.initialize()

@@ -3,10 +3,11 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UserRepository } from './user.repository';
 import { StripeService } from './stripe.service';
 import { StripeController } from './stripe.controller';
+import { User } from '../user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UserRepository]),
+    TypeOrmModule.forFeature([User, UserRepository]),
   ],
   providers: [StripeService],
   controllers: [StripeController],
