@@ -1,5 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
 import Stripe from "stripe";
+import { User } from "../user.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
@@ -9,13 +13,15 @@ if (process.env.NODE_ENV !== "production") {
 export class StripeService {
   private stripe: Stripe;
 
-  constructor() {
+
+  constructor(
+    @InjectRepository(User) private readonly userRepository: Repository<User>,) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2025-02-24.acacia",
     });
   }
 
-  /** ✅ Create a Connected Account for a user (Investor or Project Owner) */
+
   async createConnectedAccount(email: string) {
     try {
       const account = await this.stripe.accounts.create({
@@ -26,10 +32,19 @@ export class StripeService {
           transfers: { requested: true },
         },
       });
-
+  
+      // Save the email and connectedAccountId in the database
+      const user = await this.userRepository.findOne({ where: { email } });
+      if (user) {
+        user.connectedAccountId = account.id;
+        await this.userRepository.save(user);
+      } else {
+        await this.userRepository.save({ email, connectedAccountId: account.id });
+      }
+  
       return { accountId: account.id };
     } catch (error) {
-      throw new Error(`Failed to create connected account: ${error.message}`);
+      throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
     }
   }
 
@@ -63,6 +78,36 @@ export class StripeService {
     }
   }
 
+  async getConnectedAccountId(email: string) {
+    const user = await this.userRepository.findOne({ where: { email } });
+  
+    if (!user || !user.connectedAccountId) {
+      throw new HttpException("User not found or no connected account", HttpStatus.NOT_FOUND);
+    }
+  
+    return { connectedAccountId: user.connectedAccountId };
+  }
+
+   /** ✅ Complete onboarding by attaching the payment method to the platform's customer */
+   async completeOnboarding(customerId: string, email: string) {
+    try {
+      // Fetch the connectedAccountId using the user's email
+      const { connectedAccountId } = await this.getConnectedAccountId(email);
+      const paymentMethods = await this.getConnectedAccountPaymentMethods(connectedAccountId);
+
+      if (paymentMethods.length === 0) {
+        throw new Error("No payment methods found in the connected account.");
+      }
+      const paymentMethodId = paymentMethods[0].id;
+      await this.attachPaymentMethodToCustomer(customerId, paymentMethodId);
+
+      return { success: true };
+    } catch (error) {
+      throw new Error(`Failed to complete onboarding: ${error.message}`);
+    }
+  }
+
+
   async getConnectedAccountPaymentMethods(connectedAccountId: string) {
     try {
       const paymentMethods = await this.stripe.paymentMethods.list(
@@ -95,25 +140,25 @@ export class StripeService {
     }
   }
 
-  /** ✅ Complete onboarding by attaching the payment method to the platform's customer */
-  async completeOnboarding(customerId: string, connectedAccountId: string) {
-    try {
-      // Step 1: Retrieve payment methods from the connected account
-      const paymentMethods = await this.getConnectedAccountPaymentMethods(connectedAccountId);
+  // /** ✅ Complete onboarding by attaching the payment method to the platform's customer */
+  // async completeOnboarding(customerId: string, connectedAccountId: string) {
+  //   try {
+  //     // Step 1: Retrieve payment methods from the connected account
+  //     const paymentMethods = await this.getConnectedAccountPaymentMethods(connectedAccountId);
 
-      if (paymentMethods.length === 0) {
-        throw new Error("No payment methods found in the connected account.");
-      }
+  //     if (paymentMethods.length === 0) {
+  //       throw new Error("No payment methods found in the connected account.");
+  //     }
 
-      // Step 2: Attach the payment method to the platform's customer
-      const paymentMethodId = paymentMethods[0].id;
-      await this.attachPaymentMethodToCustomer(customerId, paymentMethodId);
+  //     // Step 2: Attach the payment method to the platform's customer
+  //     const paymentMethodId = paymentMethods[0].id;
+  //     await this.attachPaymentMethodToCustomer(customerId, paymentMethodId);
 
-      return { success: true };
-    } catch (error) {
-      throw new Error(`Failed to complete onboarding: ${error.message}`);
-    }
-  }
+  //     return { success: true };
+  //   } catch (error) {
+  //     throw new Error(`Failed to complete onboarding: ${error.message}`);
+  //   }
+  // }
 
   /** ✅ Fund the wallet using a saved payment method */
   async fundWallet(amount: number, currency: string, customerId: string) {
