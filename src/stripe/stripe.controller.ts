@@ -7,10 +7,17 @@ export class StripeController {
   constructor(private readonly stripeService: StripeService) {}
 
   /** ✅ Create a Stripe Connected Account for a user */
+  // @Post("create-account")
+  // async createConnectedAccount(@Body() body) {
+  //   const { email } = body;
+  //   return this.stripeService.createConnectedAccount(email);
+  // }
+
   @Post("create-account")
   async createConnectedAccount(@Body() body) {
     const { email } = body;
-    return this.stripeService.createConnectedAccount(email);
+    const { accountId } = await this.stripeService.createConnectedAccount(email);
+    return { accountId };
   }
 
   @Get("connected-payment-methods/:connectedAccountId")
@@ -30,22 +37,20 @@ export class StripeController {
     return this.stripeService.generateAccountLink(accountId);
   }
 
-  @Get('saved-payment-methods/:customerId')
-  async getSavedPaymentMethods(@Param('customerId') customerId: string) {
-    try {
-      // Call the service method to get saved payment methods
-      const paymentMethods = await this.stripeService.getSavedPaymentMethods(customerId);
-      return paymentMethods;  // Return the saved payment methods to the client
-    } catch (error) {
-      return { error: error.message };
-    }
+    /** ✅ Fetch saved payment methods */
+  @Get("saved-payment-methods/:accountId")
+  async getSavedPaymentMethods(@Param("accountId") accountId: string) {
+    const paymentMethods = await this.stripeService.getSavedPaymentMethodsForAccount(accountId);
+    return { paymentMethods };
   }
 
-  @Post("fund-wallet")
-async fundInvestorWallet(@Body() body) {
-  const { amount, currency, customerId } = body;
-  return this.stripeService.fundWallet(amount, currency, customerId);
+@Post("fund-wallet")
+async fundWallet(@Body() body) {
+  const { amount, currency, customerId, paymentMethodId } = body;
+  const { clientSecret } = await this.stripeService.fundWallet(amount, currency, customerId, paymentMethodId);
+  return { clientSecret };
 }
+
 
   /** ✅ Create a payment that transfers funds to a connected account */
   @Post("create-payment")

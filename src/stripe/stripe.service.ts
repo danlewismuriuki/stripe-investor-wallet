@@ -1,29 +1,7 @@
-// import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
-// import Stripe from "stripe";
-// import { User } from "../user.entity";
-// import { InjectRepository } from "@nestjs/typeorm";
-// import { Repository } from "typeorm";
-
-// if (process.env.NODE_ENV !== "production") {
-//   require("dotenv").config();
-// }
-
-// @Injectable()
-// export class StripeService {
-//   private stripe: Stripe;
-
-//   constructor(
-//     @InjectRepository(User) private readonly userRepository: Repository<User>,) {
-//     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-//       apiVersion: "2025-02-24.acacia",
-//     });
-//   }
-
 import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
 import Stripe from "stripe";
-import { UserRepository } from "../stripe/user.repository";  // Import the UserRepository
+import { UserRepository } from "../stripe/user.repository";
 import { InjectRepository } from "@nestjs/typeorm";
-// import { UserRepository } from '../user.repository'; // Ensure to use your custom repository
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
@@ -34,7 +12,7 @@ export class StripeService {
   private stripe: Stripe;
 
   constructor(
-    @InjectRepository(UserRepository) private readonly userRepository: UserRepository, // Inject UserRepository
+    @InjectRepository(UserRepository) private readonly userRepository: UserRepository,
   ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2025-02-24.acacia",
@@ -45,14 +23,16 @@ export class StripeService {
     try {
       const account = await this.stripe.accounts.create({
         type: "express",
-        country: "US", // Change based on user location
+        country: "US",
         email,
         capabilities: {
           transfers: { requested: true },
         },
       });
   
-      // Save the email and connectedAccountId in the database
+      console.log("Stripe account created:", account.id);
+  
+      // Save the connected account ID to the user in your database
       const user = await this.userRepository.findOne({ where: { email } });
       if (user) {
         user.connectedAccountId = account.id;
@@ -63,9 +43,11 @@ export class StripeService {
   
       return { accountId: account.id };
     } catch (error) {
+      console.error("Failed to create connected account:", error);
       throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
     }
   }
+  
 
   /** ✅ Generate an onboarding link for the user */
   async generateAccountLink(accountId: string) {
@@ -83,16 +65,17 @@ export class StripeService {
     }
   }
 
-  /** ✅ Retrieve saved payment methods for a customer */
-  async getSavedPaymentMethods(customerId: string) {
+
+  async getSavedPaymentMethodsForAccount(accountId: string) {
     try {
       const paymentMethods = await this.stripe.paymentMethods.list({
-        customer: customerId,
-        type: "card", // Fetch only card payment methods
+        customer: accountId,
+        type: "card",
       });
-
-      return paymentMethods.data; // Returns an array of saved payment methods
+  
+      return paymentMethods.data;
     } catch (error) {
+      console.error("Failed to retrieve payment methods:", error);
       throw new Error(`Failed to retrieve payment methods: ${error.message}`);
     }
   }
@@ -107,10 +90,8 @@ export class StripeService {
     return { connectedAccountId: user.connectedAccountId };
   }
 
-   /** ✅ Complete onboarding by attaching the payment method to the platform's customer */
    async completeOnboarding(customerId: string, email: string) {
     try {
-      // Fetch the connectedAccountId using the user's email
       const { connectedAccountId } = await this.getConnectedAccountId(email);
       const paymentMethods = await this.getConnectedAccountPaymentMethods(connectedAccountId);
 
@@ -140,15 +121,11 @@ export class StripeService {
     }
   }
 
-  /** ✅ Attach a payment method to the platform's customer */
   async attachPaymentMethodToCustomer(customerId: string, paymentMethodId: string) {
     try {
-      // Attach the payment method to the platform's customer
       await this.stripe.paymentMethods.attach(paymentMethodId, {
         customer: customerId,
       });
-
-      // Set the payment method as the default for the customer
       await this.stripe.customers.update(customerId, {
         invoice_settings: { default_payment_method: paymentMethodId },
       });
@@ -160,27 +137,28 @@ export class StripeService {
   }
  
 
-  /** ✅ Fund the wallet using a saved payment method */
-  async fundWallet(amount: number, currency: string, customerId: string) {
+  async fundWallet(amount: number, currency: string, customerId: string, paymentMethodId: string) {
     try {
       console.log(`Fetching payment methods for customer: ${customerId}`);
-
-      // Fetch saved payment methods for the customer
-      const paymentMethods = await this.getSavedPaymentMethods(customerId);
-
-      console.log("Payment Methods:", paymentMethods); // Log to debug
-
+      const paymentMethods = await this.getSavedPaymentMethodsForAccount(customerId);
+  
+      console.log("Payment Methods:", paymentMethods);
+  
       if (paymentMethods.length === 0) {
-        throw new Error("No payment methods found. Please add a card.");
+        throw new HttpException("No payment methods found. Please add a card.", HttpStatus.BAD_REQUEST);
       }
-
-      const paymentMethodId = paymentMethods[0].id;
-
-      // Ensure payment method is set as default
+  
+      // Ensure the selected payment method is valid
+      const selectedPaymentMethod = paymentMethods.find((pm) => pm.id === paymentMethodId);
+      if (!selectedPaymentMethod) {
+        throw new HttpException("Invalid payment method selected", HttpStatus.BAD_REQUEST);
+      }
+  
+      // Set the payment method as the default for the customer
       await this.stripe.customers.update(customerId, {
         invoice_settings: { default_payment_method: paymentMethodId },
       });
-
+  
       // Create PaymentIntent
       const paymentIntent = await this.stripe.paymentIntents.create({
         amount,
@@ -190,21 +168,21 @@ export class StripeService {
         confirm: true,
         off_session: true,
       });
-
+  
       return { clientSecret: paymentIntent.client_secret };
     } catch (error) {
       console.error("Stripe API Error:", error);
-      throw new Error(`Failed to fund wallet: ${error.message}`);
+      throw new HttpException(`Failed to fund wallet: ${error.message}`, HttpStatus.BAD_REQUEST);
     }
   }
 
-  /** ✅ Transfer funds from investor balance to borrower's account */
+
   async createPaymentWithTransfer(amount: number, currency: string, connectedAccountId: string) {
     try {
       const transfer = await this.stripe.transfers.create({
         amount,
         currency,
-        destination: connectedAccountId, // Borrower’s Stripe account
+        destination: connectedAccountId,
       });
 
       return { transferId: transfer.id };
@@ -213,13 +191,12 @@ export class StripeService {
     }
   }
 
-  /** ✅ Payout funds from the platform to a Connected Account's bank */
   async createPayout(amount: number, currency: string, connectedAccountId: string) {
     try {
       const payout = await this.stripe.payouts.create({
         amount,
         currency,
-        destination: connectedAccountId, // This should be the recipient's Stripe account ID
+        destination: connectedAccountId,
       });
 
       return { payoutId: payout.id };
