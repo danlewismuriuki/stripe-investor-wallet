@@ -1,9 +1,29 @@
+// import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
+// import Stripe from "stripe";
+// import { User } from "../user.entity";
+// import { InjectRepository } from "@nestjs/typeorm";
+// import { Repository } from "typeorm";
+
+// if (process.env.NODE_ENV !== "production") {
+//   require("dotenv").config();
+// }
+
+// @Injectable()
+// export class StripeService {
+//   private stripe: Stripe;
+
+//   constructor(
+//     @InjectRepository(User) private readonly userRepository: Repository<User>,) {
+//     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+//       apiVersion: "2025-02-24.acacia",
+//     });
+//   }
+
 import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
 import Stripe from "stripe";
-import { User } from "../user.entity";
+import { UserRepository } from "../stripe/user.repository";  // Import the UserRepository
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
-
+// import { UserRepository } from '../user.repository'; // Ensure to use your custom repository
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
@@ -13,14 +33,13 @@ if (process.env.NODE_ENV !== "production") {
 export class StripeService {
   private stripe: Stripe;
 
-
   constructor(
-    @InjectRepository(User) private readonly userRepository: Repository<User>,) {
+    @InjectRepository(UserRepository) private readonly userRepository: UserRepository, // Inject UserRepository
+  ) {
     this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
       apiVersion: "2025-02-24.acacia",
     });
   }
-
 
   async createConnectedAccount(email: string) {
     try {
@@ -139,26 +158,7 @@ export class StripeService {
       throw new Error(`Failed to attach payment method: ${error.message}`);
     }
   }
-
-  // /** ✅ Complete onboarding by attaching the payment method to the platform's customer */
-  // async completeOnboarding(customerId: string, connectedAccountId: string) {
-  //   try {
-  //     // Step 1: Retrieve payment methods from the connected account
-  //     const paymentMethods = await this.getConnectedAccountPaymentMethods(connectedAccountId);
-
-  //     if (paymentMethods.length === 0) {
-  //       throw new Error("No payment methods found in the connected account.");
-  //     }
-
-  //     // Step 2: Attach the payment method to the platform's customer
-  //     const paymentMethodId = paymentMethods[0].id;
-  //     await this.attachPaymentMethodToCustomer(customerId, paymentMethodId);
-
-  //     return { success: true };
-  //   } catch (error) {
-  //     throw new Error(`Failed to complete onboarding: ${error.message}`);
-  //   }
-  // }
+ 
 
   /** ✅ Fund the wallet using a saved payment method */
   async fundWallet(amount: number, currency: string, customerId: string) {
