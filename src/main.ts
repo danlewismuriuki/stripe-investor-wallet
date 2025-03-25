@@ -153,18 +153,29 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // ✅ Manually set CORS headers
-  app.use((req, res, next) => {
-    res.header("Access-Control-Allow-Origin", "https://stripe-investor-frontend.vercel.app");
-    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.header("Access-Control-Allow-Credentials", "true");
+  // app.use((req, res, next) => {
+  //   res.header("Access-Control-Allow-Origin", "https://stripe-investor-frontend.vercel.app");
+  //   res.header("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+  //   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  //   res.header("Access-Control-Allow-Credentials", "true");
 
-    // ✅ Handle Preflight Requests
-    if (req.method === "OPTIONS") {
-      return res.sendStatus(204);
-    }
+  //   // ✅ Handle Preflight Requests
+  //   if (req.method === "OPTIONS") {
+  //     return res.sendStatus(204);
+  //   }
 
-    next();
+  //   next();
+  // });
+
+  app.enableCors({
+    origin: [
+      'http://localhost:5173',  // Local development
+      'https://stripe-investor-frontend.vercel.app',  // Production frontend
+      /^https:\/\/stripe-investor-frontend-.*-rustys-projects-.*\.vercel\.app$/,  // Preview deployments
+    ],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
   });
 
   // ✅ Preserve raw body for Stripe webhooks
