@@ -24,8 +24,12 @@ export class StripeService {
     });
   }
 
+ 
   async createConnectedAccount(email: string) {
+    const accountIdPattern = /^acct_[a-zA-Z0-9]{24}$/;  // Stripe account ID format (acct_123abc...)
+
     try {
+      // Creating a Stripe connected account
       const account = await this.stripe.accounts.create({
         type: "express",
         country: "US",
@@ -34,51 +38,77 @@ export class StripeService {
           transfers: { requested: true },
         },
       });
-  
+
       console.log("Stripe account created:", account.id);
-  
-      // Save the connected account ID to the user in your database
-      const user = await this.userRepository.findOne({ where: { email } });
-      if (user) {
-        user.connectedAccountId = account.id;
-        await this.userRepository.save(user);
-      } else {
-        await this.userRepository.save({ email, connectedAccountId: account.id });
+
+      // Start a database transaction to ensure atomicity
+      const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+      await queryRunner.startTransaction();
+
+      try {
+        // Check if the user already exists in the database
+        const user = await this.userRepository.findOne({ where: { email } });
+        if (user) {
+          // Update the user with the connected account ID if user exists
+          user.connectedAccountId = account.id;
+          await queryRunner.manager.save(user);
+        } else {
+          // Save the new user with the connected account ID
+          await queryRunner.manager.save({ email, connectedAccountId: account.id });
+        }
+
+        // Commit the transaction
+        await queryRunner.commitTransaction();
+        return { accountId: account.id };
+      } catch (error) {
+        // Rollback in case of an error
+        console.error("Database transaction failed:", error);
+        await queryRunner.rollbackTransaction();
+        throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
+      } finally {
+        // Release the query runner
+        await queryRunner.release();
       }
-  
-      return { accountId: account.id };
+
     } catch (error) {
+      // Catching Stripe API or other errors
       console.error("Failed to create connected account:", error);
       throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
     }
   }
-  
 
+  // Function to generate the account link for onboarding
   async generateAccountLink(accountId: string) {
-    if (!accountId || typeof accountId !== 'string' || accountId.length !== 24) {  // A typical Stripe account ID is 24 characters long.
+    const accountIdPattern = /^acct_[a-zA-Z0-9]{24}$/;  // Stripe account ID format (acct_123abc...)
+
+    // Validate the account ID format
+    if (!accountId || !accountIdPattern.test(accountId)) {
       throw new Error("Invalid Account ID. Please ensure a valid account ID is passed.");
     }
-  
-    console.log("Generating account link for account ID:", accountId); // Add this line for debugging
-  
+
+    console.log("Generating account link for account ID:", accountId);
+
     try {
+      // Creating account link for onboarding
       const accountLink = await this.stripe.accountLinks.create({
         account: accountId,
         refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
         return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
         type: "account_onboarding",
       });
-  
+
+      if (!accountLink || !accountLink.url) {
+        throw new Error("Failed to generate account link.");
+      }
+
       return { url: accountLink.url };
     } catch (error) {
-      console.error("Error creating account link:", error);  // Log the error for debugging
-      throw new Error(`Failed to create account link: ${error.message}`);
+      // Log and handle the error
+      console.error("Error creating account link:", error);
+      throw new HttpException("An error occurred while generating the account link. Please try again.", HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
-  
-
-  
-  
+    
 
   async getSavedPaymentMethodsForAccount(accountId: string) {
     try {
