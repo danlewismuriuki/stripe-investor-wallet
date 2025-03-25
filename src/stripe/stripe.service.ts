@@ -1,7 +1,8 @@
 import { Injectable, HttpException, HttpStatus } from "@nestjs/common";
-import Stripe from "stripe";
-import { UserRepository } from "../stripe/user.repository";
 import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import Stripe from "stripe";
+import { User } from "../user.entity";
 
 if (process.env.NODE_ENV !== "production") {
   require("dotenv").config();
@@ -12,9 +13,13 @@ export class StripeService {
   private stripe: Stripe;
 
   constructor(
-    @InjectRepository(UserRepository) private readonly userRepository: UserRepository,
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
   ) {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error("STRIPE_SECRET_KEY is not defined");
+    }
+    
+    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
       apiVersion: "2025-02-24.acacia",
     });
   }
@@ -49,60 +54,6 @@ export class StripeService {
   }
   
 
-  /** ✅ Generate an onboarding link for the user */
-  // async generateAccountLink(accountId: string) {
-  //   try {
-  //     const accountLink = await this.stripe.accountLinks.create({
-  //       account: accountId,
-  //       refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
-  //       return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
-  //       type: "account_onboarding",
-  //     });
-
-  //     return { url: accountLink.url };
-  //   } catch (error) {
-  //     throw new Error(`Failed to create account link: ${error.message}`);
-  //   }
-  // }
-
-
-  // async generateAccountLink(accountId: string) {
-  //   if (!accountId) {
-  //     throw new Error("Account ID is required to generate the account link.");
-  //   }
-  
-  //   try {
-  //     const accountLink = await this.stripe.accountLinks.create({
-  //       account: accountId,
-  //       refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
-  //       return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
-  //       type: "account_onboarding",
-  //     });
-  
-  //     return { url: accountLink.url };
-  //   } catch (error) {
-  //     throw new Error(`Failed to create account link: ${error.message}`);
-  //   }
-  // }
-
-
-  // async generateAccountLink(accountId: string) {
-  //   console.log("Generating account link for account ID:", accountId); // Add this line for debugging
-  
-  //   try {
-  //     const accountLink = await this.stripe.accountLinks.create({
-  //       account: accountId,
-  //       refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
-  //       return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
-  //       type: "account_onboarding",
-  //     });
-  
-  //     return { url: accountLink.url };
-  //   } catch (error) {
-  //     throw new Error(`Failed to create account link: ${error.message}`);
-  //   }
-  // }
-
   async generateAccountLink(accountId: string) {
     if (!accountId || typeof accountId !== 'string' || accountId.length !== 24) {  // A typical Stripe account ID is 24 characters long.
       throw new Error("Invalid Account ID. Please ensure a valid account ID is passed.");
@@ -124,6 +75,8 @@ export class StripeService {
       throw new Error(`Failed to create account link: ${error.message}`);
     }
   }
+  
+
   
   
 
