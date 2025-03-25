@@ -25,89 +25,150 @@ export class StripeService {
   }
 
  
-  async createConnectedAccount(email: string) {
-    const accountIdPattern = /^acct_[a-zA-Z0-9]{24}$/;  // Stripe account ID format (acct_123abc...)
+  // async createConnectedAccount(email: string) {
+  //   const accountIdPattern = /^acct_[a-zA-Z0-9]{24}$/;  // Stripe account ID format (acct_123abc...)
 
-    try {
-      // Creating a Stripe connected account
-      const account = await this.stripe.accounts.create({
-        type: "express",
-        country: "US",
-        email,
-        capabilities: {
-          transfers: { requested: true },
-        },
-      });
+  //   try {
+  //     // Creating a Stripe connected account
+  //     const account = await this.stripe.accounts.create({
+  //       type: "express",
+  //       country: "US",
+  //       email,
+  //       capabilities: {
+  //         transfers: { requested: true },
+  //       },
+  //     });
 
-      console.log("Stripe account created:", account.id);
+  //     console.log("Stripe account created:", account.id);
 
-      // Start a database transaction to ensure atomicity
-      const queryRunner = this.userRepository.manager.connection.createQueryRunner();
-      await queryRunner.startTransaction();
+  //     // Start a database transaction to ensure atomicity
+  //     const queryRunner = this.userRepository.manager.connection.createQueryRunner();
+  //     await queryRunner.startTransaction();
 
-      try {
-        // Check if the user already exists in the database
-        const user = await this.userRepository.findOne({ where: { email } });
-        if (user) {
-          // Update the user with the connected account ID if user exists
-          user.connectedAccountId = account.id;
-          await queryRunner.manager.save(user);
-        } else {
-          // Save the new user with the connected account ID
-          await queryRunner.manager.save({ email, connectedAccountId: account.id });
-        }
+  //     try {
+  //       // Check if the user already exists in the database
+  //       const user = await this.userRepository.findOne({ where: { email } });
+  //       if (user) {
+  //         // Update the user with the connected account ID if user exists
+  //         user.connectedAccountId = account.id;
+  //         await queryRunner.manager.save(user);
+  //       } else {
+  //         // Save the new user with the connected account ID
+  //         await queryRunner.manager.save({ email, connectedAccountId: account.id });
+  //       }
 
-        // Commit the transaction
-        await queryRunner.commitTransaction();
-        return { accountId: account.id };
-      } catch (error) {
-        // Rollback in case of an error
-        console.error("Database transaction failed:", error);
-        await queryRunner.rollbackTransaction();
-        throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
-      } finally {
-        // Release the query runner
-        await queryRunner.release();
-      }
+  //       // Commit the transaction
+  //       await queryRunner.commitTransaction();
+  //       return { accountId: account.id };
+  //     } catch (error) {
+  //       // Rollback in case of an error
+  //       console.error("Database transaction failed:", error);
+  //       await queryRunner.rollbackTransaction();
+  //       throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
+  //     } finally {
+  //       // Release the query runner
+  //       await queryRunner.release();
+  //     }
 
-    } catch (error) {
-      // Catching Stripe API or other errors
-      console.error("Failed to create connected account:", error);
-      throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
-    }
-  }
+  //   } catch (error) {
+  //     // Catching Stripe API or other errors
+  //     console.error("Failed to create connected account:", error);
+  //     throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
+  //   }
+  // }
 
   // Function to generate the account link for onboarding
-  async generateAccountLink(accountId: string) {
-    const accountIdPattern = /^acct_[a-zA-Z0-9]{24}$/;  // Stripe account ID format (acct_123abc...)
+  // async generateAccountLink(accountId: string) {
+  //   const accountIdPattern = /^acct_[a-zA-Z0-9]{24}$/;  // Stripe account ID format (acct_123abc...)
 
-    // Validate the account ID format
-    if (!accountId || !accountIdPattern.test(accountId)) {
-      throw new Error("Invalid Account ID. Please ensure a valid account ID is passed.");
+  //   // Validate the account ID format
+  //   if (!accountId || !accountIdPattern.test(accountId)) {
+  //     throw new Error("Invalid Account ID. Please ensure a valid account ID is passed.");
+  //   }
+
+  //   console.log("Generating account link for account ID:", accountId);
+
+  //   try {
+  //     // Creating account link for onboarding
+  //     const accountLink = await this.stripe.accountLinks.create({
+  //       account: accountId,
+  //       refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
+  //       return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
+  //       type: "account_onboarding",
+  //     });
+
+  //     if (!accountLink || !accountLink.url) {
+  //       throw new Error("Failed to generate account link.");
+  //     }
+
+  //     return { url: accountLink.url };
+  //   } catch (error) {
+  //     // Log and handle the error
+  //     console.error("Error creating account link:", error);
+  //     throw new HttpException("An error occurred while generating the account link. Please try again.", HttpStatus.INTERNAL_SERVER_ERROR);
+  //   }
+  // }
+
+
+  async createConnectedAccount(email: string) {
+    try {
+        const account = await this.stripe.accounts.create({
+            type: "express",
+            country: "US",
+            email,
+            capabilities: {
+                transfers: { requested: true },
+            },
+        });
+
+        console.log("✔️ Stripe account created:", account.id);
+
+        // Fetch user before saving
+        let user = await this.userRepository.findOne({ where: { email } });
+        console.log("🔍 User before update:", user);
+
+        if (user) {
+            user.connectedAccountId = account.id;
+            await this.userRepository.save(user);
+        } else {
+            user = await this.userRepository.save({ email, connectedAccountId: account.id });
+        }
+
+        console.log("✅ User after update:", user);
+
+        return { accountId: account.id };
+    } catch (error) {
+        console.error("❌ Failed to create connected account:", error);
+        throw new HttpException(`Failed to create connected account: ${error.message}`, HttpStatus.BAD_REQUEST);
     }
+}
 
-    console.log("Generating account link for account ID:", accountId);
+
+  async generateAccountLink(accountId: string) {
+    console.log("🟢 Received accountId for link generation:", accountId);
+
+    if (!accountId || typeof accountId !== 'string' || !accountId.startsWith("acct_")) {
+        console.error("❌ Invalid Account ID passed:", accountId);
+        throw new Error("Invalid Account ID. Please ensure a valid account ID is passed.");
+    }
 
     try {
-      // Creating account link for onboarding
-      const accountLink = await this.stripe.accountLinks.create({
-        account: accountId,
-        refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
-        return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
-        type: "account_onboarding",
-      });
+        const accountLink = await this.stripe.accountLinks.create({
+            account: accountId,
+            refresh_url: "https://stripe-investor-frontend.vercel.app/reauth",
+            return_url: "https://stripe-investor-frontend.vercel.app/paymentdashboard",
+            type: "account_onboarding",
+        });
 
-      if (!accountLink || !accountLink.url) {
-        throw new Error("Failed to generate account link.");
-      }
+        console.log("🔗 Generated Stripe account link:", accountLink.url);
 
-      return { url: accountLink.url };
+        return { url: accountLink.url };
     } catch (error) {
-      // Log and handle the error
-      console.error("Error creating account link:", error);
-      throw new HttpException("An error occurred while generating the account link. Please try again.", HttpStatus.INTERNAL_SERVER_ERROR);
+        console.error("❌ Error creating account link:", error);
+        throw new Error(`Failed to create account link: ${error.message}`);
     }
-  }
+}
+
     
 
   async getSavedPaymentMethodsForAccount(accountId: string) {
