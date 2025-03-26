@@ -69,8 +69,10 @@ async fundWallet(@Body() body) {
   /** ✅ Payout funds to a connected account */
   @Post("payout")
   async createPayout(@Body() body) {
-    const { amount, currency, connectedAccountId } = body;
-    return this.stripeService.createPayout(amount, currency, connectedAccountId);
+    const { amount, currency, connectedAccountId, payoutMethodId } = body;
+    // return this.stripeService.createPayout(amount, currency, connectedAccountId);
+    return this.stripeService.createPayout(amount, currency, connectedAccountId, payoutMethodId);
+
   }
 
   @Post('webhook')
